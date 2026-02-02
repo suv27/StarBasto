@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StarBasto | Tienda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 pb-24"> <header class="sticky top-0 bg-white shadow-sm p-4 flex justify-between items-center z-50">
+        <h1 class="text-xl font-black text-blue-600 italic">StarBasto</h1>
+        <div class="relative bg-slate-100 p-2 rounded-full">
+            <i data-lucide="shopping-basket" class="text-slate-600"></i>
+            <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">0</span>
+        </div>
+    </header>
+
+    <div class="p-4">
+        <div class="relative">
+            <input type="text" id="search-input" onkeyup="searchProducts()" placeholder="Buscar Salami, Arroz, Cerveza..." 
+                class="w-full p-4 pl-12 rounded-2xl border-none shadow-md focus:ring-2 focus:ring-blue-500">
+            <i data-lucide="search" class="absolute left-4 top-4 text-slate-400" size="20"></i>
+        </div>
+    </div>
+
+    <div id="product-list" class="grid grid-cols-2 gap-4 p-4">
+        </div>
+
+    <div class="fixed bottom-6 left-0 right-0 px-6">
+        <button onclick="checkout()" id="checkout-btn" class="hidden w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-xl transition transform active:scale-95 flex justify-between px-6">
+            <span>Pedir ahora</span>
+            <span id="cart-total">RD$ 0.00</span>
+        </button>
+    </div>
+
+    <script>
+        let cart = [];
+        let allProducts = {};
+
+        // 1. Fetch products from the Backend
+        async function loadProducts() {
+            try {
+                const res = await fetch('http://127.0.0.1:8000/client/catalog');
+                allProducts = await res.json();
+                renderProducts(allProducts);
+            } catch (err) {
+                console.error("Error connecting to backend:", err);
+            }
+        }
+
+        // 2. Display products in the UI
+        function renderProducts(products) {
+            const container = document.getElementById('product-list');
+            container.innerHTML = Object.entries(products).map(([barcode, item]) => `
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                    <div class="h-28 bg-blue-50 rounded-xl mb-3 flex items-center justify-center text-blue-300">
+                        <i data-lucide="package" size="40"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-sm mb-1">${item.name}</h3>
+                    <p class="text-blue-600 font-black text-lg mb-3">RD$ ${item.price}</p>
+                    <button onclick="addToCart('${barcode}', '${item.name}', ${item.price})" 
+                        class="mt-auto bg-slate-900 text-white py-2 rounded-xl text-xs font-bold active:bg-blue-600 transition">
+                        + Agregar
+                    </button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // 3. Search Logic
+        function searchProducts() {
+            // 1. Get the text the user typed
+            const query = document.getElementById('search-input').value.toLowerCase();
+            
+            // 2. Create a container for the matches
+            const filtered = {};
+
+            // 3. Loop through your "Brain" (allProducts)
+            Object.entries(allProducts).forEach(([barcode, item]) => {
+                const productName = item.name.toLowerCase();
+                
+                // 4. If the name matches the search, add it to the list
+                if (productName.includes(query)) {
+                    filtered[barcode] = item;
+                }
+            });
+
+            // 5. Re-draw the screen with only the matches
+            renderProducts(filtered);
+        }
+
+        // 4. Cart Management
+        function addToCart(barcode, name, price) {
+            cart.push({ barcode, name, price });
+            document.getElementById('cart-count').innerText = cart.length;
+            
+            // Show checkout button
+            const btn = document.getElementById('checkout-btn');
+            btn.classList.remove('hidden');
+            
+            // Update total
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            document.getElementById('cart-total').innerText = `RD$ ${total.toFixed(2)}`;
+        }
+
+        // 5. Submit Order (Star Defense Protection)
+        async function checkout() {
+            const orderData = { 
+                items: cart.map(i => ({ 
+                    barcode: i.barcode, 
+                    quantity: 1, 
+                    price: i.price.toString() 
+                })) 
+            };
+
+            const response = await fetch('http://127.0.0.1:8000/client/order', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Star-Defense-Key': 'StarBasto_Secure_2026' 
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert("✅ ¡Éxito! Su pedido ha sido enviado.");
+                cart = [];
+                document.getElementById('cart-count').innerText = "0";
+                document.getElementById('checkout-btn').classList.add('hidden');
+            } else {
+                alert("❌ Error: " + result.detail);
+            }
+        }
+
+        // Initialize
+        loadProducts();
+    </script>
+</body>
+</html>

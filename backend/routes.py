@@ -2,6 +2,7 @@
 from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from database import search_products, update_order_status, register_owner
 
 # Import database functions
 from database import (
@@ -32,6 +33,15 @@ class OrderResponse(BaseModel):
     service_fee: float
     total_to_pay: float
 
+class OwnerAccount(BaseModel):
+    owner_id: str
+    shop_name: str
+    location: str
+
+class OwnerRegistration(BaseModel):
+    owner_id: str
+    shop_name: str
+    location: str
 # --- Routers ---
 
 # Owner Router
@@ -54,8 +64,31 @@ async def update_item(item: ProductUpdateItem):
     else:
         raise HTTPException(status_code=500, detail="Failed to update product.")
 
+
+@owner_router.post("/register")
+async def setup_account(account: OwnerAccount):
+    register_owner(account.owner_id, account.shop_name, account.location)
+    return {"message": f"Welcome {account.shop_name}! Your StarBasto account is active."}
+
+@owner_router.post("/register")
+async def setup_account(data: OwnerRegistration):
+    profile = register_owner(data.owner_id, data.shop_name, data.location)
+    return {"message": "Account created successfully!", "profile": profile}
+
 # Client Router
 client_router = APIRouter(prefix="/client", tags=["Client"])
+
+@client_router.get("/search")
+async def find_product(q: str):
+    results = search_products(q)
+    return {"results": results}
+
+@owner_router.patch("/order/{order_id}/status")
+async def change_status(order_id: str, status: str):
+    success = update_order_status(order_id, status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"message": f"Order {order_id} updated to {status}"}
 
 @client_router.get("/items")
 async def get_items():
