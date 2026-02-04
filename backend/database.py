@@ -1,28 +1,29 @@
-
 # Simulated database for products
 # Prices are in string format to simulate potential variations or currency symbols.
 # For comparison, we'll convert to float.
 
-orders_db = {} 
-owners_db = {} 
 PRODUCTS_DB = {
-    "RICE001": {"name": "Rice (1lb)", "price": 2.50, "stock": 100},
-    "SALAMI002": {"name": "Salami", "price": 5.00, "stock": 50},
-    "PRESIDENTE003": {"name": "Presidente", "price": 3.75, "stock": 75},
-    "BRUGAL001": {"name": "Brugal Leyenda", "price": 25.50, "stock": 20} # Add this!
+    "RICE001": {"name": "Rice", "price": "2.50", "stock": 100},
+    "SALAMI002": {"name": "Salami", "price": "5.00", "stock": 50},
+    "PRESIDENTE003": {"name": "Presidente", "price": "3.75", "stock": 75},
 }
 
-def get_product_by_barcode(barcode: str):
+def get_product_by_barcode(barcode: str) -> Dict[str, Any] | None:
+    """Retrieves a product by its barcode."""
     return PRODUCTS_DB.get(barcode)
 
-def update_product_stock(barcode: str, new_stock: int):
-    if barcode in PRODUCTS_DB:
-        PRODUCTS_DB[barcode]["stock"] = new_stock
-        return True
-    return False
+def get_all_products() -> Dict[str, Dict[str, Any]]:
+    """Retrieves all products, potentially filtering out out-of-stock items if desired for client view."""
+    return PRODUCTS_DB
 
-def update_product_details(barcode: str, name: str, price: str, stock_count: int):
-    # Overwrites existing item if barcode matches
+def update_product_details(barcode: str, name: str, price: str, stock_count: int) -> bool:
+    """Updates or adds a product's details. Overwrites existing item if barcode matches."""
+    try:
+        # Validate price format early
+        float(price)
+    except ValueError:
+        raise ValueError(f"Invalid price format: {price}. Price must be a number.")
+        
     PRODUCTS_DB[barcode] = {
         "name": name,
         "price": price,
@@ -30,10 +31,41 @@ def update_product_details(barcode: str, name: str, price: str, stock_count: int
     }
     return True
 
-def get_all_products():
-    return PRODUCTS_DB
+def update_product_stock(barcode: str, quantity_change: int) -> bool:
+    """Updates the stock of a product. quantity_change can be positive or negative."""
+    product = PRODUCTS_DB.get(barcode)
+    if not product:
+        return False # Product not found
+    
+    new_stock = product["stock"] + quantity_change
+    if new_stock < 0:
+        # Do not allow stock to go below zero
+        return False
+        
+    product["stock"] = new_stock
+    return True
+
+def deduct_stock(barcode: str, quantity: int) -> bool:
+    """Deducts stock for an item. Returns True if successful, False otherwise."""
+    product = PRODUCTS_DB.get(barcode)
+    if not product:
+        return False # Product not found
+    
+    if product["stock"] >= quantity:
+        product["stock"] -= quantity
+        return True
+    else:
+        return False # Insufficient stock
+
+def delete_product(barcode: str) -> bool:
+    """Removes a product from the database."""
+    if barcode in PRODUCTS_DB:
+        del PRODUCTS_DB[barcode]
+        return True
+    return False
 
 def get_product_price(barcode: str) -> float | None:
+    """Retrieves the product price as a float, or None if not found or invalid."""
     product = PRODUCTS_DB.get(barcode)
     if product:
         try:
@@ -42,35 +74,10 @@ def get_product_price(barcode: str) -> float | None:
             return None
     return None
 
-def search_products(query: str):
-    """Search for products by name (case-insensitive)."""
-    products = get_all_products() # Using your existing function
-    results = []
-    for bc, details in products.items():
-        if query.lower() in details['name'].lower():
-            results.append({"barcode": bc, **details})
-    return results
-
-def update_order_status(order_id: str, new_status: str):
-    """Updates status: 'pending', 'in_progress', 'out_for_delivery', 'delivered'."""
-    if order_id in orders_db:
-        orders_db[order_id]["status"] = new_status
+# Helper for owner to mark item as unavailable (set stock to 0)
+def mark_product_unavailable(barcode: str) -> bool:
+    product = PRODUCTS_DB.get(barcode)
+    if product:
+        product["stock"] = 0
         return True
     return False
-
-def register_owner(owner_id: str, shop_name: str, location: str):
-    owners_db[owner_id] = {
-        "shop_name": shop_name,
-        "location": location,
-        "verified": True
-    }
-    return True
-
-def register_owner(owner_id: str, shop_name: str, location: str):
-    owners_db[owner_id] = {
-        "shop_name": shop_name,
-        "location": location,
-        "verified": True,
-        "joined_date": "2026-02-02"
-    }
-    return owners_db[owner_id]
